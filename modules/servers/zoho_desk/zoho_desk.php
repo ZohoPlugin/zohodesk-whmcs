@@ -46,16 +46,30 @@ function zoho_desk_MetaData()
 function zoho_desk_ConfigOptions()
 {
 	        
-    $config = array (
-	              'Domain' => array('Type' => 'dropdown', 'Options' => 'com,eu', 'Description' => '<br>Domain Region'),
-'Authtoken' => array('Type' => 'text', 'Description' => '<br><a href="https://accounts.zoho.com/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi" target="_blank">Click here</a> to generate authtoken.')
-	          );
-	         
-	   return $config;
+    return array(
+         // the radio field type displays a series of radio button options
+        'Domain' => array(
+            'Type' => 'radio',
+            'Options' => 'com,eu,in,cn',
+            'Description' => 'Choose your domain!',
+        ),
+        // a text field type allows for single line text input
+        'Authtoken' => array(
+            'Type' => 'text',
+            'Size' => '50',
+            'Description' => '<br><a href="https://accounts.zoho.com/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi" target="_blank">Click here</a> to generate authtoken for US Domain. 
+            <br><a href="https://accounts.zoho.eu/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi" target="_blank">Click here</a> to generate authtoken for EU Domain. 
+            <br><a href="https://accounts.zoho.com.cn/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi" target="_blank">Click here</a> to generate authtoken for CN Domain. 
+            <br><a href="https://accounts.zoho.in/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi" target="_blank">Click here</a> to generate authtoken for IN Domain.',
+        ),
+       
+    );
 }
 function zoho_desk_CreateAccount(array $params)
 {
 	$addonid;
+	$urlOrg;
+	$domain = $params['configoption1'];
 	$test = $params['configoption2'];
 	try {
 	$curl = curl_init();
@@ -102,19 +116,25 @@ function zoho_desk_CreateAccount(array $params)
 	 
 	$bodyJson = array('JSONString' => $bodyArr, 'authtoken' => $test);
 	$bodyJsn = json_encode($bodyJson);
-   $curlOrg = curl_init();
-   $urlOrg = 'https://payments.zoho.'.$params['configoption1'].'/restapi/partner/v1/json/subscription';
-   curl_setopt_array($curlOrg, array(
-      CURLOPT_URL => $urlOrg,
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => "",
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => "POST",
-      CURLOPT_POSTFIELDS => $bodyJson
-   ));
+        $curlOrg = curl_init();
+       if($domain == 'cn')
+	{
+		$urlOrg = 'https://payments.zoho.com.'.$params['configoption1'].'/restapi/partner/v1/json/subscription';		
+	}
+	else 
+	{
+   		$urlOrg = 'https://payments.zoho.'.$params['configoption1'].'/restapi/partner/v1/json/subscription';
+	}
+        curl_setopt_array($curlOrg, array(
+	      CURLOPT_URL => $urlOrg,
+	      CURLOPT_RETURNTRANSFER => true,
+	      CURLOPT_ENCODING => "",
+	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+	      CURLOPT_CUSTOMREQUEST => "POST",
+	      CURLOPT_POSTFIELDS => $bodyJson
+	   ));
 
 		$responseOrg = curl_exec($curlOrg);
-		//return array('success' => $responseOrg);
 		$respOrgJson = json_decode($responseOrg); 
 		$getInfo = curl_getinfo($curlOrg,CURLINFO_HTTP_CODE);
 		curl_close($curlOrg);
@@ -146,7 +166,7 @@ function zoho_desk_CreateAccount(array $params)
         			  $pdo->rollBack();
         		  }
 	 
-    		  return array ('success' => 'Desk Org has been created.');
+    		  return array ('success' => 'Desk Org has been created successfully.');
     		    }
     		    else if(($result == 'success') && (isset($respOrgJson->ERRORMSG))) {
     		        return 'Failed  ->  '.$respOrgJson->ERRORMSG;
@@ -211,8 +231,20 @@ function zoho_desk_AdminServicesTabFields(array $params)
 {
  
    try{
-	$url = 'https://accounts.zoho.com/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi';
-	$cli = Capsule::table('zoho_desk')->where('domain',$params['domain'])->first();
+	   $paymenturl;
+	   $url;
+	   $cli = Capsule::table('zoho_desk')->where('domain',$params['domain'])->first();
+	   $domain = $params['configoption1'];
+	   if($domain == 'cn') 
+	   {
+	    $url = 'https://accounts.zoho.com.'.$domain.'/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi';
+	    $paymenturl = 'https://payments.zoho.com.'.$domain.'/store/reseller.do?profileId='.$cli->profileid;
+	  }
+	  else
+	  {
+	    $url = 'https://accounts.zoho.'.$domain.'/apiauthtoken/create?SCOPE=ZohoPayments/partnerapi';
+	    $paymenturl = 'https://payments.zoho.'.$domain.'/store/reseller.do?profileId='.$cli->profileid;
+	  }
 	$authtoken = $params['configoption2'];
 	if(!$authtoken == '') {
 	$authtoken = '<h2 style="color:green;">Authenticated</h2>';
@@ -221,18 +253,12 @@ function zoho_desk_AdminServicesTabFields(array $params)
 	$authtoken = '<a href="'.$url.'" type="submit" target="_blank"> Click here </a> (Call only once for authenticating)';
 	}
 	$response = array();
-	/*$verificationStatus;
-	if (strcmp("true",$cli->isverified) == 0) {
-		 $verificationStatus = '<b style=color:green>Verified</b>';
-	} else {
-		 $verificationStatus = '<b style=color:red>Not Verified</b>';
-	}*/
-	 
+	   
 	return array(
 	     'Authenticate' => $authtoken,
-	     'Client Control Panel' => '<a href="'.$cli->url.'" target=_blank>Click here</a>',
 	     'Super Administrator' => $cli->superAdmin,
-	     'ZOID' => $cli->zoid
+	     'ZOID' => $cli->zoid, 
+		'URL to Manage Customers' => '<a href="'.$paymenturl.'" target=_window>Click here</a>'
 	    );
 	 
     } catch (Exception $e) {
@@ -320,13 +346,23 @@ function zoho_desk_ClientArea(array $params)
 {
     $serviceAction = 'get_stats';
     $templateFile = 'templates/overview.tpl';
+	$deskurl;
+	$domain = $params['configoption1'];
+    if($domain == 'cn')
+    {
+        $deskurl = 'https://desk.zoho.com.cn';
+    }
+    else
+    {
+        $deskurl = 'https://desk.zoho.'.$domain;
+    }
     try {
       $cli = Capsule::table('zoho_desk')->where('zoid',$params['zoid'])->first();
       $urlToPanel = $cli->url;
 	return array(
 	    'tabOverviewReplacementTemplate' => $templateFile,
 	    'templateVariables' => array(
-	     'deskUrl' => 'https://desk.zoho.com'
+	     'deskUrl' => $deskurl
 	     //'panelUrl' => $urlToPanel
 	    ),
 	);
