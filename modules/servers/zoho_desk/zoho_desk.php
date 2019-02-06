@@ -50,7 +50,7 @@ function zoho_desk_ConfigOptions()
          // the radio field type displays a series of radio button options
         'Domain' => array(
             'Type' => 'radio',
-            'Options' => 'com,eu,in,cn',
+            'Options' => 'com,eu,cn,in',
             'Description' => 'Choose your domain!',
         ),
         // a text field type allows for single line text input
